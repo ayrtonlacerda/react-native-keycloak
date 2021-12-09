@@ -140,9 +140,10 @@ class RNAdapter implements KeycloakAdapter {
       headers: {
         'Content-type': 'application/x-www-form-urlencoded',
       },
-      body: params,
+      body: this.initOptions.clientSecret
+        ? String(`${params}&client_secret=${this.initOptions.clientSecret}`)
+        : params,
     });
-
     return (await tokenRes.json()) as FetchTokenResponse;
   }
 
