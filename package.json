@@ -50,12 +50,12 @@
   "dependencies": {
     "@react-keycloak/core": "^3.2.0",
     "@react-keycloak/keycloak-ts": "^0.2.3",
+    "@react-native-async-storage/async-storage": "^1.16.1",
     "react-native-inappbrowser-reborn": "^3.6.3"
   },
   "peerDependencies": {
     "react": "*",
-    "react-native": "*",
-    "@react-native-async-storage/async-storage": "*"
+    "react-native": "*"
   },
   "devDependencies": {
     "@commitlint/config-conventional": "^8.3.4",
