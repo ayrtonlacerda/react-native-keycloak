@@ -14,12 +14,13 @@ import type {
 import InAppBrowser from 'react-native-inappbrowser-reborn';
 
 import LocalStorage from './storage';
+import { Storage } from '../service';
 import type { RNKeycloakInitOptions } from './types';
 import { fetchJSON } from './utils';
 
 class RNAdapter implements KeycloakAdapter {
   private readonly client: Readonly<KeycloakInstance>;
-
+  private tokenStorage: any;
   private readonly initOptions: Readonly<RNKeycloakInitOptions>;
 
   constructor(
@@ -29,6 +30,7 @@ class RNAdapter implements KeycloakAdapter {
   ) {
     this.client = client;
     this.initOptions = initOptions;
+    this.tokenStorage = new Storage();
   }
 
   createCallbackStorage(): CallbackStorage {
@@ -42,7 +44,22 @@ class RNAdapter implements KeycloakAdapter {
    */
   async login(options?: KeycloakLoginOptions): Promise<void> {
     const loginUrl = this.client.createLoginUrl(options);
-
+    /**
+     * Remover esse if por uma verificacao de token salvo.
+     */
+    const recuveredToken = await this.tokenStorage.recuverToken();
+    if (recuveredToken) {
+      const fakeValue = {
+        state: 'fake',
+        session_state: 'fake',
+        code: 'fake',
+        newUrl: 'fake',
+        valid: true,
+        redirectUri: 'fake',
+        storedNonce: 'fake',
+      };
+      return this.client.processCallback(fakeValue);
+    }
     if (await InAppBrowser.isAvailable()) {
       // See for more details https://github.com/proyecto26/react-native-inappbrowser#authentication-flow-using-deep-linking
       const res = await InAppBrowser.openAuth(
@@ -55,7 +72,6 @@ class RNAdapter implements KeycloakAdapter {
         const oauth = this.client.parseCallback(res.url);
         return this.client.processCallback(oauth);
       }
-
       throw new Error('Authentication flow failed');
     } else {
       throw new Error('InAppBrowser not available');
@@ -66,7 +82,7 @@ class RNAdapter implements KeycloakAdapter {
 
   async logout(options?: KeycloakLogoutOptions): Promise<void> {
     const logoutUrl = this.client.createLogoutUrl(options);
-
+    await this.tokenStorage.cleanToken();
     if (await InAppBrowser.isAvailable()) {
       // See for more details https://github.com/proyecto26/react-native-inappbrowser#authentication-flow-using-deep-linking
       const res = await InAppBrowser.openAuth(
@@ -135,6 +151,10 @@ class RNAdapter implements KeycloakAdapter {
     tokenUrl: string,
     params: string
   ): Promise<FetchTokenResponse> {
+    const recuveredToken = await this.tokenStorage.recuverToken();
+    if (recuveredToken) {
+      return await JSON.parse(recuveredToken);
+    }
     const tokenRes = await fetch(tokenUrl, {
       method: 'POST',
       headers: {
@@ -144,7 +164,11 @@ class RNAdapter implements KeycloakAdapter {
         ? String(`${params}&client_secret=${this.initOptions.clientSecret}`)
         : params,
     });
-    return (await tokenRes.json()) as FetchTokenResponse;
+    const response = (await tokenRes.json()) as FetchTokenResponse;
+    if (response.access_token) {
+      await this.tokenStorage.saveToken(response);
+    }
+    return response;
   }
 
   async refreshTokens(
@@ -158,7 +182,6 @@ class RNAdapter implements KeycloakAdapter {
       },
       body: params,
     });
-
     return (await tokenRes.json()) as FetchTokenResponse;
   }
 
